@@ -207,6 +207,38 @@ class Target():
                     ]
                 line.pres.extend(parse_lines(ss))
 
+    def modify_indirect_base(self, func, line, base):
+        b = [0x48, 0xb8]
+        if line.opcode == 'call':
+            b.extend([0x00, 0x00])
+        ss = [
+                f"push %rax",
+            ]
+        if base != '':
+            ss.extend([
+                    f"mov 1f(%rip), %rax",
+                    f"add {base}, %rax",
+                ])
+        else:
+            ss.extend([
+                    f"lea {func.name}(%rip), %rax",
+                    f"add 1f(%rip), %rax",
+                ])
+        ss.extend([
+                f"je 2f",
+                f"jmp *%rax",
+                f".data",
+                f"1:",
+                f".quad 3f-{func.name}",
+                f".previous",
+                f"2:",
+                f"pop %rax", # dummy
+                f".byte " + ", ".join(list(map(hex, b))),
+                f"3:",
+                f"pop %rax",
+            ])
+        line.pres.extend(parse_lines(ss))
+
     def obfuscate_indirect_simple(self):
         for f in self.functions:
             p = f.frame_alloc
@@ -215,23 +247,7 @@ class Target():
             for line in f.lines:
                 if line.opcode != 'call':
                     continue
-                ss = [
-                        f"push %rax",
-                        f"lea {f.name}(%rip), %rax",
-                        f"add 1f(%rip), %rax",
-                        f"je 2f",
-                        f"jmp *%rax",
-                        f".data",
-                        f"1:",
-                        f".quad 3f-{f.name}",
-                        f".previous",
-                        f"2:",
-                        f"pop %rax", # dummy
-                        f".byte 0x48, 0xb8, 0x00, 0x00",
-                        f"3:",
-                        f"pop %rax",
-                    ]
-                line.pres.extend(parse_lines(ss))
+                self.modify_indirect_base(f, line, '')
 
     def obfuscate_indirect_base(self):
         for f in self.functions:
@@ -268,23 +284,7 @@ class Target():
             for line in f.lines:
                 if line.opcode != 'call':
                     continue
-                ss = [
-                        f"push %rax",
-                        f"mov 1f(%rip), %rax",
-                        f"add %rbx, %rax",
-                        f"je 2f",
-                        f"jmp *%rax",
-                        f".data",
-                        f"1:",
-                        f".quad 3f-{f.name}",
-                        f".previous",
-                        f"2:",
-                        f"pop %rax", # dummy
-                        f".byte 0x48, 0xb8, 0x00, 0x00",
-                        f"3:",
-                        f"pop %rax",
-                    ]
-                line.pres.extend(parse_lines(ss))
+                self.modify_indirect_base(f, line, base)
 
 def main():
     if len(sys.argv) != 2:
