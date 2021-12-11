@@ -219,7 +219,6 @@ class Target():
                         f"push %rax",
                         f"lea {f.name}(%rip), %rax",
                         f"add 1f(%rip), %rax",
-                        f"cmp $0, %rax",
                         f"je 2f",
                         f"jmp *%rax",
                         f".data",
@@ -293,7 +292,7 @@ def main():
     src = sys.argv[1]
     target = Target(src)
     target.analyze()
-    target.obfuscate_indirect_base()
+    target.obfuscate_indirect_simple()
     target.save()
 
 if __name__ == '__main__':
