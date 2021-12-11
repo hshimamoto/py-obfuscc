@@ -34,11 +34,14 @@ class Line():
         self.words = words
         self.pres = []
         self.posts = []
+        self.modified = ''
         self.comment = ''
     def __str__(self):
         line = self.line
         if self.directive == '':
             line = " ".join(self.words)
+        if self.modified != '':
+            line = self.modified
         if self.comment != '':
             line = f"{line} # {self.comment}"
         return self.indent + line
@@ -231,13 +234,66 @@ class Target():
                     ]
                 line.pres.extend(parse_lines(ss))
 
+    def obfuscate_indirect_base(self):
+        for f in self.functions:
+            p = f.frame_alloc
+            if p == None:
+                continue
+            base = '%rbx'
+            if base in f.regs:
+                print(f"unable to use {base}")
+                continue
+            # reserve
+            alloc = f.frame_alloc
+            restore = f.frame_restore
+            if alloc == None or restore == None:
+                print("unable to frame handling")
+                continue
+            # alloc -> subq $16, %rsp
+            sz = int(alloc.operands[0].strip(',')[1:])
+            print(f"frame size = {sz} -> {sz+16}")
+            sz += 16
+            # change alloc line
+            alloc.modified = f"subq ${sz}, %rsp"
+            alloc.posts.extend(parse_lines([
+                f"movq %rbx, (%rsp)",
+                f"leaq {f.name}(%rip), %rbx"]))
+            # check restore
+            if restore.opcode == 'leave':
+                pass # ok nothing to do
+            if restore.opcode == 'addq':
+                print(f"orig restore: {restore.line}")
+                # change restore line
+                restore.modified = f"addq ${sz}, %rsp"
+            restore.pres.extend(parse_lines(["movq (%rsp), %rbx"]))
+            for line in f.lines:
+                if line.opcode != 'call':
+                    continue
+                ss = [
+                        f"push %rax",
+                        f"mov 1f(%rip), %rax",
+                        f"add %rbx, %rax",
+                        f"je 2f",
+                        f"jmp *%rax",
+                        f".data",
+                        f"1:",
+                        f".quad 3f-{f.name}",
+                        f".previous",
+                        f"2:",
+                        f"pop %rax", # dummy
+                        f".byte 0x48, 0xb8, 0x00, 0x00",
+                        f"3:",
+                        f"pop %rax",
+                    ]
+                line.pres.extend(parse_lines(ss))
+
 def main():
     if len(sys.argv) != 2:
         exit(1)
     src = sys.argv[1]
     target = Target(src)
     target.analyze()
-    target.obfuscate_indirect_simple()
+    target.obfuscate_indirect_base()
     target.save()
 
 if __name__ == '__main__':
