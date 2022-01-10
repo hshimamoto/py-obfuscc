@@ -249,6 +249,32 @@ class Target():
                     continue
                 self.modify_indirect_base(f, line, '')
 
+    def obfuscate_movq_regs(self):
+        for f in self.functions:
+            p = f.frame_alloc
+            if p == None:
+                continue
+            for line in f.lines:
+                # movq %rax, %rdi
+                if line.opcode != 'movq':
+                    continue
+                op0 = line.operands[0].strip(',')
+                op1 = line.operands[1]
+                print(f"check movq {op0} {op1}")
+                if op0[0] != '%' or op0[1] != 'r':
+                    continue
+                if op1[0] != '%' or op1[1] != 'r':
+                    continue
+                if op0 == '%rsp':
+                    continue
+                if op1 == '%rsp':
+                    continue
+                print(f"replace with push/pop")
+                line.modified = f"# movq {op0}, {op1}"
+                line.posts.extend(parse_lines([
+                    f"pushq {op0}",
+                    f"popq {op1}"]))
+
     def obfuscate_indirect_base(self):
         for f in self.functions:
             p = f.frame_alloc
@@ -293,6 +319,7 @@ def main():
     target = Target(src)
     target.analyze()
     target.obfuscate_indirect_simple()
+    target.obfuscate_movq_regs()
     target.save()
 
 if __name__ == '__main__':
