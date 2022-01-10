@@ -283,14 +283,14 @@ class Target():
                         f"pushq {op0}",
                         f"popq {op1}"]))
                 else:
-                    b3 = 0
+                    b0 = 0xb8
                     for r in gpregs:
                         if op1 == r:
                             break
-                        b3 += 1
+                        b0 += 1
                     line.modified = f"# movq {op0}, {op1}"
                     line.posts.extend(parse_lines([
-                        f".byte 0xc7, 0xc{b3}",
+                        f".byte 0x{b0:x}",
                         f"1:",
                         f"pushq {op0}",
                         f"popq {op1}",
