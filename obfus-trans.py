@@ -270,10 +270,33 @@ class Target():
                 if op1 == '%rsp':
                     continue
                 print(f"replace with push/pop")
-                line.modified = f"# movq {op0}, {op1}"
-                line.posts.extend(parse_lines([
-                    f"pushq {op0}",
-                    f"popq {op1}"]))
+                gpregs = ['%rax', '%rcx', '%rdx', '%rbx', '%RSP', '%rbp', '%rsi', '%rdi']
+                gp = True
+                if not op0 in gpregs:
+                    gp = False
+                if not op1 in gpregs:
+                    gp = False
+                if not gp:
+                    # movq $XXXX, gp1
+                    line.modified = f"# movq {op0}, {op1}"
+                    line.posts.extend(parse_lines([
+                        f"pushq {op0}",
+                        f"popq {op1}"]))
+                else:
+                    b3 = 0
+                    for r in gpregs:
+                        if op1 == r:
+                            break
+                        b3 += 1
+                    line.modified = f"# movq {op0}, {op1}"
+                    line.posts.extend(parse_lines([
+                        f".byte 0xc7, 0xc{b3}",
+                        f"1:",
+                        f"pushq {op0}",
+                        f"popq {op1}",
+                        f"jmp 2f",
+                        f"jmp 1b",
+                        f"2:"]))
 
     def obfuscate_indirect_base(self):
         for f in self.functions:
