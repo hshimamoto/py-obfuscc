@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# MIT License Copyright(c) 2021 Hiroshi Shimamoto
+# MIT License Copyright(c) 2021, 2022 Hiroshi Shimamoto
 
 import sys
 

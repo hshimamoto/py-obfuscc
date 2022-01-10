@@ -6,4 +6,4 @@ to obfuscated assembler code.
 
 License
 -------
-MIT License Copyright(c) 2021 Hiroshi Shimamoto
+MIT License Copyright(c) 2021, 2022 Hiroshi Shimamoto
