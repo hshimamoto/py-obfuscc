@@ -256,15 +256,25 @@ class Target():
                 continue
             for line in f.lines:
                 # movq %rax, %rdi
-                if line.opcode != 'movq':
+                opcode = line.opcode
+                if opcode != 'movq' and opcode != 'movl':
                     continue
                 op0 = line.operands[0].strip(',')
                 op1 = line.operands[1]
-                print(f"check movq {op0} {op1}")
-                if op0[0] != '%' or op0[1] != 'r':
+                print(f"check {opcode} {op0} {op1}")
+                if op0[0] != '%':
                     continue
-                if op1[0] != '%' or op1[1] != 'r':
+                if op1[0] != '%':
                     continue
+                if ':' in op0:
+                    continue
+                if ':' in op1:
+                    continue
+                if opcode == 'movl':
+                    print("use 64bit reg")
+                    promote = lambda x: x.strip('d') if x[1] == 'r' else "%r" + x[2:]
+                    op0 = promote(op0)
+                    op1 = promote(op1)
                 if op0 == '%rsp':
                     continue
                 if op1 == '%rsp':
@@ -276,9 +286,9 @@ class Target():
                     gp = False
                 if not op1 in gpregs:
                     gp = False
+                line.modified = "#" + line.orig.strip()
                 if not gp:
                     # movq $XXXX, gp1
-                    line.modified = f"# movq {op0}, {op1}"
                     line.posts.extend(parse_lines([
                         f"pushq {op0}",
                         f"popq {op1}"]))
@@ -288,7 +298,6 @@ class Target():
                         if op1 == r:
                             break
                         b0 += 1
-                    line.modified = f"# movq {op0}, {op1}"
                     line.posts.extend(parse_lines([
                         f".byte 0x{b0:x}",
                         f"1:",
