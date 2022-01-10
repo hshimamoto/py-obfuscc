@@ -36,6 +36,7 @@ class Line():
         self.posts = []
         self.modified = ''
         self.comment = ''
+        self.eflags = 'unknown'
     def __str__(self):
         line = self.line
         if self.directive == '':
@@ -141,6 +142,26 @@ class Target():
                     line.prev = prev
                     prev.next = line
                 prev = line
+            # eflags effect
+            for line in f.lines:
+                opcode = line.opcode
+                if opcode == 'call':
+                    line.eflags = 'free'
+                    continue
+                ops = ['and', 'or', 'xor', 'test', 'cmp', 'add', 'sub']
+                for c in ops:
+                    for s in ['', 'q', 'l', 'w', 'b']:
+                        if opcode == c + s:
+                            line.eflags = 'free'
+                            break
+                if line.eflags != 'unknown':
+                    continue
+                ops = ['mov', 'lea']
+                for c in ops:
+                    for s in ['', 'q', 'l', 'w', 'b']:
+                        if opcode == c + s:
+                            line.eflags = 'pass'
+                            break
             # get all registers using in this function
             regs = []
             for line in f.lines:
@@ -288,6 +309,14 @@ class Target():
                     gp = False
                 line.modified = "#" + line.orig.strip()
                 if not gp:
+                    # check eflags
+                    free = False
+                    n = line.next
+                    while n.eflags == 'pass':
+                        n = n.next
+                    free = n.eflags == 'free'
+                    line.comment = f"elfags affected op usable? {free}"
+                    print(line.comment)
                     # movq $XXXX, gp1
                     line.posts.extend(parse_lines([
                         f"pushq {op0}",
